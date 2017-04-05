@@ -1,0 +1,12 @@
+[Unit]
+Description=rosbridge by paw-tracks
+After=rosrun.service
+
+[Service]
+ExecStart=/usr/bin/rosbridge.sh
+
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

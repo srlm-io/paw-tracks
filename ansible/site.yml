@@ -1,0 +1,122 @@
+---
+- hosts: all
+  become: true
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: Check if nodejs is installed
+      command: dpkg -s nodejs
+      ignore_errors: True
+      changed_when: no
+      register: dpkg_nodejs_check
+
+    - name: Install nodejs apt key to get the latest version
+      command: curl -sL https://deb.nodesource.com/setup_7.x | sudo -E bash -
+      when: dpkg_nodejs_check.stdout.find('is not installed') != -1
+
+    - name: Install nodejs and other packages
+      apt:
+            name: "{{item}}"
+            update_cache: yes
+            cache_valid_time: 36000
+      with_items:
+            - nodejs
+            - build-essential
+            - ros-indigo-rosbridge-server
+
+    - name: Set Ardupilot to start on boot
+      become: true
+      lineinfile:
+          dest: /lib/systemd/system/ardupilot.service
+          regexp: '^#?ExecStart=\/opt\/ardupilot\/navio2\/arduplane\/bin\/arduplane \$ARDUPILOT_OPTS'
+          line: 'ExecStart=/opt/ardupilot/navio2/arduplane/bin/arduplane $ARDUPILOT_OPTS'
+    - name: Enable Ardupilot
+      become: true
+      service:
+        name: ardupilot
+        state: started
+        enabled: yes
+    - name: Install the rosrun script
+      become: true
+      copy:
+            src: roscore.sh
+            dest: /usr/bin/roscore.sh
+            mode: 0755
+    - name: Install the roscore service
+      become: true
+      copy:
+            src: roscore.service
+            dest: /lib/systemd/system/roscore.service
+    - name: Enable Roscore
+      become: true
+      service:
+            name: roscore
+            state: started
+            enabled: yes
+
+    - name: Install the Rosrun script
+      become: true
+      copy:
+            src: rosrun.sh
+            dest: /usr/bin/rosrun.sh
+            mode: 0755
+    - name: Install the Rosrun service
+      become: true
+      copy:
+            src: rosrun.service
+            dest: /lib/systemd/system/rosrun.service
+    - name: Enable Rosrun
+      become: true
+      service:
+            name: rosrun
+            state: started
+            enabled: yes
+
+    - name: Install the Rosbridge script
+      become: true
+      copy:
+            src: rosbridge.sh
+            dest: /usr/bin/rosbridge.sh
+            mode: 0755
+    - name: Install the Rosbridge service
+      become: true
+      copy:
+            src: rosbridge.service
+            dest: /lib/systemd/system/rosbridge.service
+
+    - name: Enable Rosbridge
+      become: true
+      service:
+            name: rosbridge
+            state: started
+            enabled: yes
+
+    - name: Creat data directory
+      file: path=/data state=directory owner=dingo
+      tags:
+        - deploy
+
+    - name: Copy the source code
+      become: true
+      synchronize:
+            src: ../src
+            dest: /opt/paw-tracks/
+      tags:
+        - deploy
+
+    - name: Install npm packages
+      become: true
+      npm:
+            path: /opt/paw-tracks/
+
+    - name: Install the Paw Tracks service
+      become: true
+      copy:
+            src: paw-tracks.service
+            dest: /lib/systemd/system/paw-tracks.service
+    - name: Enable Paw Tracks Service
+      become: true
+      service:
+            name: paw-tracks
+            state: started
+            enabled: yes
